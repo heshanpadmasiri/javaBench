@@ -1,40 +1,10 @@
-/*
- * Copyright (c) 2014, Oracle America, Inc.
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- *  * Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
- *
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *
- *  * Neither the name of Oracle nor the names of its contributors may be used
- *    to endorse or promote products derived from this software without
- *    specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
- * THE POSSIBILITY OF SUCH DAMAGE.
- */
-
 package org.sample;
 
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Mode;
+import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.infra.Blackhole;
 
 import java.util.Random;
@@ -50,11 +20,26 @@ public class MyBenchmark {
         }
     }
 
+    private final static InsnImp[] impInsns;
+    static {
+        impInsns = new InsnImp[N];
+        for (int i = 0; i < N; i++) {
+            impInsns[i] = InstructionBuilder.getImpInsn();
+        }
+    }
+
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    @Fork(value = 1, warmups = 0)
+    @Fork(value = 1, jvmArgsPrepend = {
+            "-XX:+UnlockDiagnosticVMOptions",
+            "-XX:+PrintAssembly",
+            "-XX:PrintAssemblyOptions=intel",
+            "-XX:+LogCompilation",
+            "-XX:+PrintInlining",
+            "-XX:LogFile=jvm.log"
+    })
     public void tagAndCast(Blackhole blackhole) {
-        for(var insn: insns) {
+        for (var insn : insns) {
             switch (insn.kind()) {
                 case Foo -> {
                     FooInsn fooInsn = (FooInsn) insn;
@@ -76,11 +61,52 @@ public class MyBenchmark {
         }
     }
 
+
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    @Fork(value = 1, warmups = 0)
+    @Fork(value = 1, jvmArgsPrepend = {
+            "-XX:+UnlockDiagnosticVMOptions",
+            "-XX:+PrintAssembly",
+            "-XX:PrintAssemblyOptions=intel",
+            "-XX:+LogCompilation",
+            "-XX:+PrintInlining",
+            "-XX:LogFile=jvm.log"
+    })
+    public void tagAndCastImp(Blackhole blackhole) {
+        for (var insn : impInsns) {
+            switch (insn.kind()) {
+                case Foo -> {
+                    FooImp fooInsn = (FooImp) insn;
+                    blackhole.consume(fooInsn.foo());
+                }
+                case Bar -> {
+                    BarImp barInsn = (BarImp) insn;
+                    blackhole.consume(barInsn.bar());
+                }
+                case Baz -> {
+                    BazImp bazInsn = (BazImp) insn;
+                    blackhole.consume(bazInsn.baz());
+                }
+                case FooBar -> {
+                    FooBarImp fooBarInsn = (FooBarImp) insn;
+                    blackhole.consume(fooBarInsn.fooBar());
+                }
+            }
+        }
+    }
+
+    @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    @Fork(value = 1, jvmArgsPrepend = {
+            "-XX:+UnlockDiagnosticVMOptions",
+            "-XX:+PrintAssembly",
+            "-XX:PrintAssemblyOptions=intel",
+            "-XX:+LogCompilation",
+            "-XX:+PrintInlining",
+            "-XX:LogFile=jvm.log"
+    })
     public void instanceOfAndCall(Blackhole blackhole) {
-        for(var insn: insns) {
+        for (var insn : insns) {
             if (insn instanceof FooInsn fooInsn) {
                 blackhole.consume(fooInsn.foo());
             } else if (insn instanceof BarInsn barInsn) {
@@ -96,12 +122,25 @@ public class MyBenchmark {
 
 final class InstructionBuilder {
     static Insn getRandomInsn() {
-        return switch (Kind.values()[new Random().nextInt(Kind.values().length)]) {
+        return switch (randomKind()) {
             case Foo -> new FooInsn();
             case Bar -> new BarInsn();
             case Baz -> new BazInsn();
             case FooBar -> new FooBarInsn();
-            default -> throw new IllegalStateException();
+        };
+    }
+
+    private static Kind randomKind() {
+        Kind[] values = Kind.values();
+        return values[new Random().nextInt(values.length)];
+    }
+
+    static InsnImp getImpInsn() {
+        return switch (randomKind()) {
+            case Foo -> new FooImp();
+            case Bar -> new BarImp();
+            case Baz -> new BazImp();
+            case FooBar -> new FooBarImp();
         };
     }
 }
@@ -154,6 +193,65 @@ class FooBarInsn implements Insn {
     @Override
     public Kind kind() {
         return Kind.FooBar;
+    }
+
+    long fooBar() {
+        return 0L;
+    }
+}
+
+// This is so that CHA can figure out only one implementation of kind exists. Otherwise creating other Insn (probably)
+// disables devirtualization.
+interface InsnImp {
+    Kind kind();
+}
+
+abstract class InsnBase implements InsnImp {
+    private final Kind kind;
+
+    InsnBase(Kind kind) {
+        this.kind = kind;
+    }
+
+    @Override
+    public final Kind kind() {
+        return kind;
+    }
+}
+
+class FooImp extends InsnBase {
+    FooImp() {
+        super(Kind.Foo);
+    }
+
+    int foo() {
+        return 0;
+    }
+}
+
+class BarImp extends InsnBase {
+    BarImp() {
+        super(Kind.Bar);
+    }
+
+    String bar() {
+        return "";
+    }
+}
+
+class BazImp extends InsnBase {
+    BazImp() {
+        super(Kind.Baz);
+    }
+
+    double baz() {
+        return 0.0;
+    }
+}
+
+class FooBarImp extends InsnBase {
+    FooBarImp() {
+        super(Kind.FooBar);
     }
 
     long fooBar() {
