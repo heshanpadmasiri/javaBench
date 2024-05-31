@@ -30,14 +30,12 @@ public class MyBenchmark {
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    @Fork(value = 1, jvmArgsPrepend = {
-            "-XX:+UnlockDiagnosticVMOptions",
-            "-XX:+PrintAssembly",
-            "-XX:PrintAssemblyOptions=intel",
-            "-XX:+LogCompilation",
-            "-XX:+PrintInlining",
-            "-XX:LogFile=jvm.log"
-    })
+    //@Fork(value = 1, jvmArgsPrepend = {
+    //        "-XX:+UnlockDiagnosticVMOptions",
+    //        "-XX:+LogCompilation",
+    //        "-XX:+PrintInlining",
+    //        "-XX:LogFile=tagAndCast.log"
+    //})
     public void tagAndCast(Blackhole blackhole) {
         for (var insn : insns) {
             switch (insn.kind()) {
@@ -64,14 +62,12 @@ public class MyBenchmark {
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    @Fork(value = 1, jvmArgsPrepend = {
-            "-XX:+UnlockDiagnosticVMOptions",
-            "-XX:+PrintAssembly",
-            "-XX:PrintAssemblyOptions=intel",
-            "-XX:+LogCompilation",
-            "-XX:+PrintInlining",
-            "-XX:LogFile=jvm.log"
-    })
+    //@Fork(value = 1, jvmArgsPrepend = {
+    //        "-XX:+UnlockDiagnosticVMOptions",
+    //        "-XX:+LogCompilation",
+    //        "-XX:+PrintInlining",
+    //        "-XX:LogFile=tagAndCastImp.log"
+    //})
     public void tagAndCastImp(Blackhole blackhole) {
         for (var insn : impInsns) {
             switch (insn.kind()) {
@@ -97,14 +93,12 @@ public class MyBenchmark {
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    @Fork(value = 1, jvmArgsPrepend = {
-            "-XX:+UnlockDiagnosticVMOptions",
-            "-XX:+PrintAssembly",
-            "-XX:PrintAssemblyOptions=intel",
-            "-XX:+LogCompilation",
-            "-XX:+PrintInlining",
-            "-XX:LogFile=jvm.log"
-    })
+    //@Fork(value = 1, jvmArgsPrepend = {
+    //        "-XX:+UnlockDiagnosticVMOptions",
+    //        "-XX:+LogCompilation",
+    //        "-XX:+PrintInlining",
+    //        "-XX:LogFile=instanceOfAndCall.log"
+    //})
     public void instanceOfAndCall(Blackhole blackhole) {
         for (var insn : insns) {
             if (insn instanceof FooInsn fooInsn) {
