@@ -5,29 +5,67 @@ import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Mode;
 import org.openjdk.jmh.annotations.Param;
+import org.openjdk.jmh.annotations.Scope;
+import org.openjdk.jmh.annotations.Setup;
+import org.openjdk.jmh.annotations.State;
+import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.infra.Blackhole;
 
 import java.util.Random;
 
 public class MyBenchmark {
     private final static int N = 100_000_000;
-    private final static Insn[] insns;
 
-    static {
-        insns = new Insn[N];
-        for (int i = 0; i < N; i++) {
-            insns[i] = InstructionBuilder.getRandomInsn();
+    @State(Scope.Benchmark)
+    public static class InsnState {
+        Insn[] insns;
+
+        @Setup
+        public void setup() {
+            insns = new Insn[N];
+            Random random = new Random(1234);
+            for (int i = 0; i < N; i++) {
+                Insn ins = switch(randomKind(random)) {
+                    case Foo -> new FooInsn();
+                    case Bar -> new BarInsn();
+                    case Baz -> new BazInsn();
+                    case FooBar -> new FooBarInsn();
+                };
+                insns[i] = ins;
+            }
+        }
+
+        @TearDown
+        public void tearDown() {
+            insns = null;
         }
     }
 
-    private final static InsnImp[] impInsns;
-    static {
-        impInsns = new InsnImp[N];
-        for (int i = 0; i < N; i++) {
-            impInsns[i] = InstructionBuilder.getImpInsn();
-        }
+
+    private static Kind randomKind(Random rng) {
+        Kind[] values = Kind.values();
+        return values[rng.nextInt(values.length)];
     }
 
+    @State(Scope.Benchmark)
+    public static class InsnImpState {
+        InsnImp[] insns;
+
+        @Setup
+        public void setup() {
+            insns = new InsnImp[N];
+            Random random = new Random(1234);
+            for (int i = 0; i < N; i++) {
+                InsnImp ins = switch(randomKind(random)) {
+                    case Foo -> new FooImp();
+                    case Bar -> new BarImp();
+                    case Baz -> new BazImp();
+                    case FooBar -> new FooBarImp();
+                };
+                insns[i] = ins;
+            }
+        }
+    }
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
     //@Fork(value = 1, jvmArgsPrepend = {
@@ -36,8 +74,8 @@ public class MyBenchmark {
     //        "-XX:+PrintInlining",
     //        "-XX:LogFile=tagAndCast.log"
     //})
-    public void tagAndCast(Blackhole blackhole) {
-        for (var insn : insns) {
+    public void tagAndCast(Blackhole blackhole, InsnState state) {
+        for (var insn : state.insns) {
             switch (insn.kind()) {
                 case Foo -> {
                     FooInsn fooInsn = (FooInsn) insn;
@@ -68,8 +106,8 @@ public class MyBenchmark {
     //        "-XX:+PrintInlining",
     //        "-XX:LogFile=tagAndCastImp.log"
     //})
-    public void tagAndCastImp(Blackhole blackhole) {
-        for (var insn : impInsns) {
+    public void tagAndCastImp(Blackhole blackhole, InsnImpState state) {
+        for (var insn : state.insns) {
             switch (insn.kind()) {
                 case Foo -> {
                     FooImp fooInsn = (FooImp) insn;
@@ -99,8 +137,8 @@ public class MyBenchmark {
     //        "-XX:+PrintInlining",
     //        "-XX:LogFile=instanceOfAndCall.log"
     //})
-    public void instanceOfAndCall(Blackhole blackhole) {
-        for (var insn : insns) {
+    public void instanceOfAndCall(Blackhole blackhole, InsnState state) {
+        for (var insn : state.insns) {
             if (insn instanceof FooInsn fooInsn) {
                 blackhole.consume(fooInsn.foo());
             } else if (insn instanceof BarInsn barInsn) {
@@ -111,31 +149,6 @@ public class MyBenchmark {
                 blackhole.consume(fooBarInsn.fooBar());
             }
         }
-    }
-}
-
-final class InstructionBuilder {
-    static Insn getRandomInsn() {
-        return switch (randomKind()) {
-            case Foo -> new FooInsn();
-            case Bar -> new BarInsn();
-            case Baz -> new BazInsn();
-            case FooBar -> new FooBarInsn();
-        };
-    }
-
-    private static Kind randomKind() {
-        Kind[] values = Kind.values();
-        return values[new Random().nextInt(values.length)];
-    }
-
-    static InsnImp getImpInsn() {
-        return switch (randomKind()) {
-            case Foo -> new FooImp();
-            case Bar -> new BarImp();
-            case Baz -> new BazImp();
-            case FooBar -> new FooBarImp();
-        };
     }
 }
 
